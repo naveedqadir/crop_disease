@@ -1,0 +1,41 @@
+# Crop Disease Detection System - Requirements
+#
+# Core dependencies
+# -----------------
+
+# OpenCV for video capture and image processing
+opencv-python>=4.8.0
+
+# HuggingFace Transformers for pre-trained models
+transformers>=4.30.0
+
+# PyTorch for deep learning inference
+torch>=2.0.0
+torchvision>=0.15.0
+
+# NumPy for numerical operations
+numpy>=1.24.0
+
+# Pillow for image handling
+Pillow>=10.0.0
+
+# Excel export support
+openpyxl>=3.1.0
+
+# Optional: TensorFlow fallback support
+# tensorflow>=2.13.0
+
+# Raspberry Pi specific dependencies
+# -----------------------------------
+# Install these only on Raspberry Pi:
+# picamera2>=0.3.12
+
+# Development dependencies
+# ------------------------
+# pytest>=7.4.0
+# black>=23.0.0
+# flake8>=6.1.0
+
+# Utilities
+# ---------
+tqdm>=4.66.0
