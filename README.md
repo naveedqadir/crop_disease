@@ -42,56 +42,122 @@ The system is trained on the PlantVillage dataset and can detect diseases in:
 
 ## Installation
 
-### Prerequisites
+### PC / Laptop Setup
+
+#### Prerequisites
 
 - Python 3.8 or higher
 - Webcam or video file for testing
-- (Optional) Raspberry Pi with camera module
 
-### Setup
+#### Steps
 
 1. **Clone or create the project directory**:
    ```bash
    cd crop_disease
    ```
 
-2. **Create a virtual environment** (recommended):
+2. **Create a virtual environment**:
    ```bash
    python -m venv venv
- 
+
    # Windows
    venv\Scripts\activate
- 
+
    # Linux/macOS
    source venv/bin/activate
    ```
- 
+
 3. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
- 
-4. **For Raspberry Pi** (additional steps):
-   ```bash
-   # Install picamera2
-   sudo apt install -y python3-picamera2
- 
-   # Or via pip
-   pip install picamera2
- 
-   pip install --upgrade pip setuptools wheel
-   pip install -r requirements_rasp.txt
- 
-  sudo apt --fix-broken install
-  #if needed
-  sudo apt-get update
-  sudo apt-get upgrade
- 
-  sudo apt-get install libcap-dev
-  pip install picamera2
- 
- 
-   ```
+
+---
+
+### Raspberry Pi Setup
+
+#### Prerequisites
+
+- Raspberry Pi (3B+, 4, 5, or Zero 2 W) running **Raspberry Pi OS (Bookworm or Bullseye)**
+- Pi Camera Module (v1, v2, or HQ Camera) connected via CSI ribbon cable
+- Python 3.11 (ships with Raspberry Pi OS Bookworm)
+
+#### Step 1 — Enable the Camera
+
+```bash
+# Open Raspberry Pi configuration
+sudo raspi-config
+# Navigate to: Interface Options > Camera > Enable
+# Reboot when prompted
+sudo reboot
+```
+
+Verify the camera is detected after reboot:
+
+```bash
+# Check camera is recognized
+libcamera-hello --list-cameras
+# You should see your camera listed (e.g., imx219 for Pi Camera v2)
+
+# Quick test — shows a 5-second preview
+libcamera-hello -t 5000
+```
+
+#### Step 2 — Install System Packages
+
+These packages provide `picamera2`, `libcamera`, and other native libraries that cannot be installed via pip:
+
+```bash
+sudo apt-get update && sudo apt-get upgrade -y
+sudo apt-get install -y \
+    python3-picamera2 \
+    python3-libcamera \
+    python3-kms++ \
+    python3-prctl \
+    python3-v4l2 \
+    libcap-dev \
+    libatlas-base-dev
+```
+
+#### Step 3 — Create Virtual Environment & Install Python Packages
+
+The `--system-site-packages` flag is **required** so the venv can access `picamera2`, `libcamera`, and other system-installed packages that are not available on PyPI for ARM:
+
+```bash
+cd ~/Desktop/crop_disease
+
+# Create venv WITH access to system packages
+python3 -m venv --system-site-packages venv
+
+# Activate venv
+source venv/bin/activate
+
+# Upgrade pip
+pip install --upgrade pip setuptools wheel
+
+# Install Raspberry Pi optimized dependencies
+pip install -r requirements_rasp.txt
+```
+
+#### Step 4 — Verify Installation
+
+```bash
+source venv/bin/activate
+
+# Verify picamera2 imports correctly
+python3 -c "from picamera2 import Picamera2; print('picamera2 OK')"
+
+# Verify torch imports
+python3 -c "import torch; print(f'PyTorch {torch.__version__} OK')"
+```
+
+> **Note:** If `picamera2` import fails with `ModuleNotFoundError: No module named 'libcamera'`, ensure the venv was created with `--system-site-packages`. You can fix an existing venv by recreating it:
+> ```bash
+> rm -rf venv
+> python3 -m venv --system-site-packages venv
+> source venv/bin/activate
+> pip install -r requirements_rasp.txt
+> ```
 
 ## Usage
 
@@ -196,7 +262,8 @@ python main.py --log-level DEBUG
 ```
 crop_disease/
 ├── main.py                 # Main application entry point
-├── requirements.txt        # Python dependencies
+├── requirements.txt        # Python dependencies (PC/laptop)
+├── requirements_rasp.txt   # Python dependencies (Raspberry Pi — ARM optimized)
 ├── README.md              # This file
 ├── .gitignore             # Git ignore patterns
 ├── config/
@@ -360,38 +427,84 @@ torch.save(model.state_dict(), 'models/crop_disease_model.pth')
 
 ### For Raspberry Pi
 
-- Use `--picamera` flag - automatically applies optimized settings (skip_frames=10)
-- For even lower resource usage: `--width 320 --height 240`
-- Use headless mode for automated processing: `--no-display`
-- The system auto-detects Raspberry Pi and uses picamera2 library
+- Always use `--picamera` flag — it uses `picamera2` (native CSI interface) instead of OpenCV
+- Optimized settings are auto-applied: `skip_frames=10`, `640x480` resolution
+- For lower resource usage: `python main.py --picamera --width 320 --height 240`
+- Headless mode for automated/remote processing: `python main.py --picamera --no-display`
+- Use `requirements_rasp.txt` instead of `requirements.txt` — it pins ARM-compatible versions
+- Consider increasing swap to 2 GB if the model loading is slow or fails
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Camera not detected**:
+1. **Camera not detected (PC)**:
    ```bash
-   # Check available cameras
    python -c "import cv2; print(cv2.VideoCapture(0).isOpened())"
    ```
 
 2. **Model download issues**:
    ```bash
-   # Check internet connection - model downloads from HuggingFace on first run
+   # Model downloads from HuggingFace on first run — ensure internet access
    pip install --upgrade transformers torch
    ```
 
-3. **Pi Camera not working**:
+3. **Pi Camera — `picamera2 not available. Falling back to OpenCV`**:
+
+   This means `picamera2` or `libcamera` is not accessible inside your venv. Fix:
    ```bash
-   # Enable camera in raspi-config
-   sudo raspi-config
-   # Navigate to Interface Options > Camera > Enable
+   # Install system packages
+   sudo apt-get install -y python3-picamera2 python3-libcamera
+
+   # Recreate venv with --system-site-packages
+   rm -rf venv
+   python3 -m venv --system-site-packages venv
+   source venv/bin/activate
+   pip install -r requirements_rasp.txt
+
+   # Verify
+   python3 -c "from picamera2 import Picamera2; print('OK')"
    ```
 
-4. **Out of memory on Raspberry Pi**:
-   - Increase swap space
-   - Reduce frame resolution
-   - Use `--skip-frames 10` or higher
+4. **Pi Camera — `Failed to read frame from camera` (endless loop)**:
+
+   This usually means OpenCV fallback is being used instead of `picamera2`. The CSI camera does not work well with OpenCV's `VideoCapture(0)`. Ensure you:
+   - Run with `--picamera` flag: `python main.py --picamera`
+   - Have `picamera2` properly symlinked (see issue 3 above)
+   - Have the camera enabled: `sudo raspi-config` → Interface Options → Camera
+
+5. **Pi Camera — `libcamera` errors or camera not found**:
+   ```bash
+   # Check if camera hardware is detected
+   libcamera-hello --list-cameras
+
+   # If nothing is listed:
+   # - Check the CSI ribbon cable is firmly seated (contacts facing the board)
+   # - Ensure camera is enabled in raspi-config
+   # - Try rebooting: sudo reboot
+   ```
+
+6. **Out of memory on Raspberry Pi**:
+   ```bash
+   # Increase swap space
+   sudo dphys-swapfile swapoff
+   sudo nano /etc/dphys-swapfile    # Set CONF_SWAPSIZE=2048
+   sudo dphys-swapfile setup
+   sudo dphys-swapfile swapon
+
+   # Or reduce resource usage
+   python main.py --picamera --width 320 --height 240 --skip-frames 15
+   ```
+
+7. **`requirements_rasp.txt` install fails**:
+   ```bash
+   # Ensure you have build tools
+   sudo apt-get install -y build-essential python3-dev libatlas-base-dev
+
+   # Use piwheels (pre-built ARM wheels) — enabled by default on Pi OS
+   pip install --upgrade pip
+   pip install -r requirements_rasp.txt
+   ```
 
 ## License
 

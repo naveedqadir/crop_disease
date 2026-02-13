@@ -115,7 +115,11 @@ class VideoProcessor:
             return True
             
         except ImportError:
-            logger.warning("picamera2 not available. Falling back to OpenCV.")
+            logger.warning(
+                "picamera2 not available. Ensure 'libcamera' and 'picamera2' system packages "
+                "are accessible in this Python environment (symlink from /usr/lib/python3/dist-packages/ "
+                "if using a venv). Falling back to OpenCV."
+            )
             return self._init_opencv()
         except Exception as e:
             logger.error(f"Failed to initialize Pi Camera: {e}")
@@ -155,6 +159,8 @@ class VideoProcessor:
         """
         self.fps_start_time = time.time()
         frame_times = []
+        consecutive_failures = 0
+        max_consecutive_failures = 50
         
         while self.is_running:
             ret, frame = self.read_frame()
@@ -166,9 +172,19 @@ class VideoProcessor:
                     break
                 else:
                     # Camera error
-                    logger.warning("Failed to read frame from camera")
+                    consecutive_failures += 1
+                    if consecutive_failures <= 5 or consecutive_failures % 50 == 0:
+                        logger.warning(f"Failed to read frame from camera (attempt {consecutive_failures})")
+                    if consecutive_failures >= max_consecutive_failures:
+                        logger.error(
+                            f"Camera failed to produce frames after {max_consecutive_failures} attempts. "
+                            "Check camera connection and ensure the correct camera interface is enabled."
+                        )
+                        break
                     time.sleep(0.1)
                     continue
+            
+            consecutive_failures = 0
             
             self.frame_count += 1
             
