@@ -58,26 +58,39 @@ The system is trained on the PlantVillage dataset and can detect diseases in:
 2. **Create a virtual environment** (recommended):
    ```bash
    python -m venv venv
-   
+ 
    # Windows
    venv\Scripts\activate
-   
+ 
    # Linux/macOS
    source venv/bin/activate
    ```
-
+ 
 3. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
-
+ 
 4. **For Raspberry Pi** (additional steps):
    ```bash
    # Install picamera2
    sudo apt install -y python3-picamera2
-   
+ 
    # Or via pip
    pip install picamera2
+ 
+   pip install --upgrade pip setuptools wheel
+   pip install -r requirements_rasp.txt
+ 
+  sudo apt --fix-broken install
+  #if needed
+  sudo apt-get update
+  sudo apt-get upgrade
+ 
+  sudo apt-get install libcap-dev
+  pip install picamera2
+ 
+ 
    ```
 
 ## Usage
